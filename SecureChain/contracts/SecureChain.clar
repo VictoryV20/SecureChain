@@ -253,6 +253,42 @@
     )
 )
 
+;; Report fraud or suspicious activity
+(define-public (report-fraud (shipment-id uint) (alert-type (string-ascii 50)) 
+                            (severity uint) (description (string-ascii 200)))
+    (let
+        (
+            (caller tx-sender)
+            (new-alert-id (+ (var-get alert-counter) u1))
+            (shipment-data (unwrap! (map-get? shipments shipment-id) err-not-found))
+        )
+        (asserts! (is-some (map-get? participants caller)) err-unauthorized)
+        (asserts! (<= severity risk-level-critical) err-invalid-threshold)
+        
+        (var-set alert-counter new-alert-id)
+        
+        (map-set fraud-alerts new-alert-id
+            {
+                alert-id: new-alert-id,
+                shipment-id: shipment-id,
+                reporter: caller,
+                alert-type: alert-type,
+                severity: severity,
+                description: description,
+                timestamp: block-height,
+                resolved: false
+            })
+        
+        (map-set shipments shipment-id
+            (merge shipment-data {
+                is-flagged: true,
+                status: status-flagged
+            }))
+        
+        (ok new-alert-id)
+    )
+)
+
 ;; Verify and complete shipment delivery
 (define-public (complete-delivery (shipment-id uint) (verification-hash (buff 32)))
     (let
